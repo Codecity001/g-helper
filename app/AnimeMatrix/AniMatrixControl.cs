@@ -168,7 +168,7 @@ namespace GHelper.AnimeMatrix
                 deviceSlash.SetLidCloseAnimation(!matrixLid && !AppConfig.Is("slash_sleep"));
             }
 
-            if (matrixLid || force || deviceMatrix is not null)
+            if (matrixLid || force)
             {
                 Logger.WriteLine($"Matrix LidClosed: {lidClose}");
                 SetDevice(true);
@@ -195,6 +195,7 @@ namespace GHelper.AnimeMatrix
             int brightness = AppConfig.Get("matrix_brightness", 0);
             int running = AppConfig.Get("matrix_running", 0);
             bool auto = AppConfig.Is("matrix_auto");
+            bool lid = AppConfig.Is("matrix_lid");
 
             StopMatrixTimer();
             StopAudio();
@@ -213,9 +214,8 @@ namespace GHelper.AnimeMatrix
 
                 if (wakeUp) deviceMatrix.WakeUp();
 
-                if (brightness == 0 || (auto && SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Online) || lidClose)
+                if (brightness == 0 || (auto && SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Online) || (lid && lidClose))
                 {
-                    deviceMatrix.SetBuiltInAnimation(false);
                     deviceMatrix.SetDisplayState(false);
                     deviceMatrix.SetDisplayState(false); // some devices are dumb
                     Logger.WriteLine("Matrix Off");
@@ -273,7 +273,7 @@ namespace GHelper.AnimeMatrix
         private void MatrixTimer_Elapsed(object? sender, ElapsedEventArgs e)
         {
 
-            if (deviceMatrix is null || lidClose) return;
+            if (deviceMatrix is null) return;
 
             switch (AppConfig.Get("matrix_running"))
             {
@@ -451,7 +451,7 @@ namespace GHelper.AnimeMatrix
         void PresentAudio(double[] audio)
         {
 
-            if (lidClose || (deviceMatrix is null && deviceSlash is null)) return;
+            if (deviceMatrix is null && deviceSlash is null) return;
 
             if (Math.Abs(DateTimeOffset.Now.ToUnixTimeMilliseconds() - lastPresent) < 30)   return;
             lastPresent = DateTimeOffset.Now.ToUnixTimeMilliseconds();
