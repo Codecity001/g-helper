@@ -76,6 +76,12 @@ namespace GHelper.AnimeMatrix
         {
             if (deviceSlash is null) return;
 
+            if (lidClose)
+            {
+                PowerOffAll();
+                return;
+            }
+
             int brightness = AppConfig.Get("matrix_brightness", 0);
             int running = AppConfig.Get("matrix_running", 0);
             int inteval = AppConfig.Get("matrix_interval", 0);
@@ -99,7 +105,7 @@ namespace GHelper.AnimeMatrix
 
                 if (wakeUp) _wakeUp = true;
 
-                if (brightness == 0 || (auto && SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Online) || (lid && lidClose))
+                if (brightness == 0 || (auto && SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Online) || lidClose)
                 {
                     deviceSlash.SetSleepActive(false);
                     deviceSlash.SetEnabled(false);
@@ -159,20 +165,38 @@ namespace GHelper.AnimeMatrix
             });
         }
 
+        private void PowerOffAll()
+        {
+            StopMatrixTimer();
+            StopAudio();
+
+            if (deviceMatrix != null)
+            {
+                deviceMatrix.SetDisplayState(false);
+                deviceMatrix.SetDisplayState(false);
+            }
+
+            if (deviceSlash != null)
+            {
+                deviceSlash.SetEnabled(false);
+                deviceSlash.SetSleepActive(false);
+            }
+
+            Logger.WriteLine("AnimeMatrix fully powered off (lid closed)");
+        }
+
         public void SetLidMode(bool force = false)
         {
-            bool matrixLid = AppConfig.Is("matrix_lid");
-
             if (deviceSlash is not null)
-            {
-                deviceSlash.SetLidCloseAnimation(!matrixLid && !AppConfig.Is("slash_sleep"));
-            }
+                deviceSlash.SetLidCloseAnimation(false);
 
-            if (matrixLid || force)
+            if (lidClose)
             {
-                Logger.WriteLine($"Matrix LidClosed: {lidClose}");
-                SetDevice(true);
+                PowerOffAll();
+                return;
             }
+            Logger.WriteLine($"Matrix LidClosed: {lidClose}");
+            SetDevice(true);
         }
 
         public void SetBatteryAuto()
@@ -191,6 +215,12 @@ namespace GHelper.AnimeMatrix
         {
 
             if (deviceMatrix is null) return;
+
+            if (lidClose)
+            {
+                PowerOffAll();
+                return;
+            }
 
             int brightness = AppConfig.Get("matrix_brightness", 0);
             int running = AppConfig.Get("matrix_running", 0);
@@ -213,8 +243,7 @@ namespace GHelper.AnimeMatrix
                 }
 
                 if (wakeUp) deviceMatrix.WakeUp();
-
-                if (brightness == 0 || (auto && SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Online) || (lid && lidClose))
+                if (brightness == 0 || (auto && SystemInformation.PowerStatus.PowerLineStatus != PowerLineStatus.Online) || lidClose)
                 {
                     deviceMatrix.SetDisplayState(false);
                     deviceMatrix.SetDisplayState(false); // some devices are dumb
@@ -273,7 +302,7 @@ namespace GHelper.AnimeMatrix
         private void MatrixTimer_Elapsed(object? sender, ElapsedEventArgs e)
         {
 
-            if (deviceMatrix is null) return;
+            if (deviceMatrix is null || lidClose) return;
 
             switch (AppConfig.Get("matrix_running"))
             {
@@ -451,7 +480,7 @@ namespace GHelper.AnimeMatrix
         void PresentAudio(double[] audio)
         {
 
-            if (deviceMatrix is null && deviceSlash is null) return;
+            if (lidClose || (deviceMatrix is null && deviceSlash is null)) return;
 
             if (Math.Abs(DateTimeOffset.Now.ToUnixTimeMilliseconds() - lastPresent) < 30)   return;
             lastPresent = DateTimeOffset.Now.ToUnixTimeMilliseconds();
