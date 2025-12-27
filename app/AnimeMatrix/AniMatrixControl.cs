@@ -159,18 +159,16 @@ namespace GHelper.AnimeMatrix
             });
         }
 
-        private void ForceMatrixOff()
+        public void PreventLatchOn()
         {
             StopMatrixTimer();
-
             if (deviceMatrix != null) // matrix hardware has priority
             {
                 deviceMatrix.Clear();
                 deviceMatrix.SetDisplayState(false);
                 deviceMatrix.SetDisplayState(false); // some devices are dumb
             }
-            StopAudio(); // Based on windows might take 100-200ms to actually stop
-            Logger.WriteLine("AnimeMatrix fully powered off (lid closed)");
+            StopAudio();
         }
 
         public void SetLidMode(bool force = false)
@@ -182,11 +180,13 @@ namespace GHelper.AnimeMatrix
                 deviceSlash.SetLidCloseAnimation(!matrixLid && !AppConfig.Is("slash_sleep"));
             }
 
-            if (matrixLid || force)
+            if (lidClose && deviceMatrix is not null)
             {
-                Logger.WriteLine($"Matrix LidClosed: {lidClose}");
-                SetDevice(true);
+                PreventLatchOn();
+                return;
             }
+            Logger.WriteLine("Lid open — setting devices");
+            SetDevice(true);
         }
 
         public void SetBatteryAuto()
@@ -209,18 +209,13 @@ namespace GHelper.AnimeMatrix
             int running = AppConfig.Get("matrix_running", 0);
             bool auto = AppConfig.Is("matrix_auto");
             bool lid = AppConfig.Is("matrix_lid");
-            // CRITICAL: turn off immediately on lid close
-            if (lid && lidClose)
-            {
-                ForceMatrixOff();
-                return;
-            }
 
             StopMatrixTimer();
-            // --- MINIMAL CHANGE: immediately clear and turn off LEDs ---
-            deviceMatrix.Clear(); // clear any pending frames
-            deviceMatrix.SetDisplayState(false);   
-            deviceMatrix.SetDisplayState(false); // some devices are dumb
+            if (lidClose)
+            {
+                PreventLatchOn();
+                return;
+            }
             StopAudio();
 
             Task.Run(() =>
@@ -296,7 +291,7 @@ namespace GHelper.AnimeMatrix
         private void MatrixTimer_Elapsed(object? sender, ElapsedEventArgs e)
         {
 
-            if (deviceMatrix is null) return;
+            if (deviceMatrix is null || lidClose) return;
 
             switch (AppConfig.Get("matrix_running"))
             {
@@ -474,7 +469,7 @@ namespace GHelper.AnimeMatrix
         void PresentAudio(double[] audio)
         {
 
-            if (deviceMatrix is null && deviceSlash is null) return;
+            if (lidClose || (deviceMatrix is null && deviceSlash is null)) return;
 
             if (Math.Abs(DateTimeOffset.Now.ToUnixTimeMilliseconds() - lastPresent) < 30)   return;
             lastPresent = DateTimeOffset.Now.ToUnixTimeMilliseconds();
@@ -495,6 +490,7 @@ namespace GHelper.AnimeMatrix
 
             if (deviceMatrix is not null)
             {
+                if (lidClose) return;
                 deviceMatrix.Clear();
                 for (int i = 0; i < size; i++) deviceMatrix.DrawBar(20 - i, bars[i] * 20 / maxAverage);
                 deviceMatrix.Present();
