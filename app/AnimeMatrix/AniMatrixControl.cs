@@ -159,6 +159,20 @@ namespace GHelper.AnimeMatrix
             });
         }
 
+        private void ForceMatrixOff()
+        {
+            StopMatrixTimer();
+
+            if (deviceMatrix != null) // matrix hardware has priority
+            {
+                deviceMatrix.Clear();
+                deviceMatrix.SetDisplayState(false);
+                deviceMatrix.SetDisplayState(false); // some devices are dumb
+            }
+            StopAudio(); // Based on windows might take 100-200ms to actually stop
+            Logger.WriteLine("AnimeMatrix fully powered off (lid closed)");
+        }
+
         public void SetLidMode(bool force = false)
         {
             bool matrixLid = AppConfig.Is("matrix_lid");
@@ -191,13 +205,22 @@ namespace GHelper.AnimeMatrix
         {
 
             if (deviceMatrix is null) return;
-
             int brightness = AppConfig.Get("matrix_brightness", 0);
             int running = AppConfig.Get("matrix_running", 0);
             bool auto = AppConfig.Is("matrix_auto");
             bool lid = AppConfig.Is("matrix_lid");
+            // CRITICAL: turn off immediately on lid close
+            if (lid && lidClose)
+            {
+                ForceMatrixOff();
+                return;
+            }
 
             StopMatrixTimer();
+            // --- MINIMAL CHANGE: immediately clear and turn off LEDs ---
+            deviceMatrix.Clear(); // clear any pending frames
+            deviceMatrix.SetDisplayState(false);   
+            deviceMatrix.SetDisplayState(false); // some devices are dumb
             StopAudio();
 
             Task.Run(() =>
