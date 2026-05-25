@@ -335,6 +335,10 @@ namespace GHelper
             if (!switched)
             {
                 gpuControl.InitGPUMode();
+                if (powerChanged && AppConfig.Is("screen_auto"))
+                {
+                    Thread.Sleep(1000);
+                }
                 ScreenControl.AutoScreen();
             }
 
